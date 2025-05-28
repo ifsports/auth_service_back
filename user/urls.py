@@ -4,5 +4,5 @@ from .views import *
 
 
 urlpatterns = [
-    path("login_suap/", suap_login, name="suap_login"),
+    path("api/v1/auth/login", suap_login, name="suap_login"),
 ]
