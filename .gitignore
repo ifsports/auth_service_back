@@ -1,8 +1,81 @@
-env
-venv
-.env
-.venv
+# .gitignore
 
+# Arquivos de Ambiente Virtual
+# -----------------------------------------------------------------------------
+env/
+venv/
+.env/
+.venv/
+env.bak/
+venv.bak/
+
+# Arquivo de variáveis de ambiente (NUNCA versionar o .env real!)
+# -----------------------------------------------------------------------------
+.env
+
+# Byte-code Python e caches
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos de Banco de Dados (SQLite é comum ignorar em desenvolvimento)
+# -----------------------------------------------------------------------------
+*.sqlite3
 db.sqlite3
-__pycache__/	
-*.pyc	
+db.sqlite3-journal # Arquivo de journal do SQLite
+
+# Arquivos de Log
+# -----------------------------------------------------------------------------
+*.log
+logs/
+*.log.*
+
+# Arquivos de configuração de IDEs e Editores
+# -----------------------------------------------------------------------------
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.DS_Store
+Thumbs.db
+desktop.ini
+
+# Arquivos de sistema operacional
+# -----------------------------------------------------------------------------
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Arquivos gerados pelo Django (ex: se você rodar collectstatic localmente)
+# -----------------------------------------------------------------------------
+# Se o seu STATIC_ROOT for 'staticfiles', por exemplo:
+# staticfiles_collected/
+# Se o seu MEDIA_ROOT for 'mediafiles', por exemplo:
+# mediafiles/
+
+# Arquivos de Cobertura de Testes
+# -----------------------------------------------------------------------------
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Arquivos de build/distribuição Python (se você gerar pacotes)
+# -----------------------------------------------------------------------------
+# build/
+# dist/
+# *.egg-info/
+# *.egg
+
+# Arquivos específicos do Docker que você não quer versionar (raro, pois o .dockerignore cuida do build da imagem)
+# -----------------------------------------------------------------------------
+# .docker/ # Se você tiver configurações locais do Docker que não quer compartilhar
+
+# Outros
+# -----------------------------------------------------------------------------
+# *.swp # Arquivos de swap do Vim
+# .mypy_cache/
+# .pytest_cache/

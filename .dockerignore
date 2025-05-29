@@ -1,0 +1,34 @@
+# .dockerignore
+
+# Ambiente virtual
+venv/
+env/
+.venv/
+
+# Arquivos de cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Arquivos de configuração de IDEs
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Arquivos de SQLite (opcional, veja nota sobre o banco de dados)
+# Se você quer que o banco de dados seja reconstruído ou gerenciado por volumes,
+# adicione db.sqlite3 aqui. Se quiser copiar o db.sqlite3 atual para a imagem, remova a linha abaixo.
+# db.sqlite3
+
+# Arquivos de mídia e estáticos coletados (se você os tiver localmente e não quiser copiar)
+# mediafiles/
+# staticfiles_collected/ # Nome da pasta de staticfiles após collectstatic
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml # Se você tiver um
