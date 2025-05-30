@@ -29,7 +29,7 @@ def get_tokens_for_user(user):
     }
 
 
-# --- VIEW DE CALLBACK SUAP (VERSÃO SIMPLIFICADA SEM TRATAMENTO DE ERRO EXPLÍCITO) ---
+# --- VIEW DE CALLBACK SUAP  ---
 def suap_oauth_callback_view(request):
     code = request.GET.get("code")
     frontend_url_base = getattr(settings, "FRONTEND_APP_URL", "http://localhost:3000")
@@ -112,7 +112,6 @@ class LogoutView(APIView):
 
     def post(self, request, *args, **kwargs):
         # Lógica de logout (ex: blacklist de token se implementado)
-        # ... (como estava antes) ...
         print(
             f"Usuário {request.user.matricula} solicitou logout. O cliente deve remover os tokens.")
         return Response({"detail": "Logout recebido. O cliente deve invalidar/remover os tokens JWT."}, status=status.HTTP_200_OK)
