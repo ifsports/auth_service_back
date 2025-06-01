@@ -117,6 +117,56 @@ class LogoutView(APIView):
         return Response({"detail": "Logout recebido. O cliente deve invalidar/remover os tokens JWT."}, status=status.HTTP_200_OK)
 
 
+class ValidateUsersExistenceView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        user_ids_to_validate = request.data.get('user_ids', [])
+
+        if not isinstance(user_ids_to_validate, list) or not all(
+                isinstance(uid, (str, int)) for uid in user_ids_to_validate):
+            return Response({
+                    "error": "Entrada inválida. 'user_ids' deve ser uma lista de IDs."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user_ids_to_validate:
+            return Response({
+                    "all_exist": True,
+                    "valid_ids": [],
+                    "invalid_ids": []
+                }, status=status.HTTP_200_OK)
+
+        try:
+            existing_users_queryset = User.objects.filter(id__in=user_ids_to_validate)
+            existing_user_ids = set(str(user.id) for user in
+                                    existing_users_queryset)
+
+            user_ids_to_validate_str = set(str(uid) for uid in user_ids_to_validate)
+
+            invalid_ids = list(user_ids_to_validate_str - existing_user_ids)
+            valid_ids = list(existing_user_ids)
+
+            if not invalid_ids:
+                return Response({
+                    "all_exist": True,
+                    "message": "Todos os usuários fornecidos são válidos.",
+                    "valid_ids": valid_ids,
+                    "invalid_ids": []
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    "all_exist": False,
+                    "message": f"Os seguintes IDs de usuário não foram encontrados: {', '.join(invalid_ids)}",
+                    "valid_ids": valid_ids,
+                    "invalid_ids": invalid_ids
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({
+                "error": "Ocorreu um erro ao processar a solicitação."
+            },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class UserMeView(APIView):
     permission_classes = [IsAuthenticated]
 
