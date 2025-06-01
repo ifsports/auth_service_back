@@ -17,8 +17,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 5. Copiar o restante do código do projeto
 COPY . /app/
 
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # 6. Expor a porta que a aplicação usará dentro do container
 EXPOSE 8000
+
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # 7. Comando para rodar a aplicação (servidor de desenvolvimento do Django)
 # Para um setup de desenvolvimento. Migrações podem ser rodadas manualmente
