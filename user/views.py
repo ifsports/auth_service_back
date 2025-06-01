@@ -121,50 +121,53 @@ class ValidateUsersByMatriculaView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        user_ids_to_validate = request.data.get('user_ids', [])
+        matriculas_para_validar = request.data.get('user_ids', [])
 
-        if not isinstance(user_ids_to_validate, list) or not all(
-                isinstance(uid, (str, int)) for uid in user_ids_to_validate):
-            return Response({
-                    "error": "Entrada inválida. 'user_ids' deve ser uma lista de IDs."
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        if not user_ids_to_validate:
-            return Response({
-                    "all_exist": True,
-                    "valid_ids": [],
-                    "invalid_ids": []
-                }, status=status.HTTP_200_OK)
+        if not isinstance(matriculas_para_validar, list):
+            return Response(
+                {"error": "Entrada inválida. 'user_ids' (contendo matrículas) deve ser uma lista."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
-            existing_users_queryset = User.objects.filter(id__in=user_ids_to_validate)
-            existing_user_ids = set(str(user.id) for user in
-                                    existing_users_queryset)
+            matriculas_para_validar_str = [str(m) for m in matriculas_para_validar]
+        except ValueError:
+            return Response(
+                {"error": "Formato de matrícula inválido. Todas as matrículas devem ser conversíveis para string."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            user_ids_to_validate_str = set(str(uid) for uid in user_ids_to_validate)
+        if not matriculas_para_validar_str:
+            return Response(
+                {"all_exist": True, "message": "Nenhuma matrícula fornecida para validação.", "valid_ids": [],
+                 "invalid_ids": []},
+                status=status.HTTP_200_OK
+            )
 
-            invalid_ids = list(user_ids_to_validate_str - existing_user_ids)
-            valid_ids = list(existing_user_ids)
+        usuarios_existentes_qs = User.objects.filter(matricula__in=matriculas_para_validar_str)
 
-            if not invalid_ids:
-                return Response({
-                    "all_exist": True,
-                    "message": "Todos os usuários fornecidos são válidos.",
-                    "valid_ids": valid_ids,
-                    "invalid_ids": []
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({
-                    "all_exist": False,
-                    "message": f"Os seguintes IDs de usuário não foram encontrados: {', '.join(invalid_ids)}",
-                    "valid_ids": valid_ids,
-                    "invalid_ids": invalid_ids
-                }, status=status.HTTP_400_BAD_REQUEST)
+        matriculas_existentes_no_db = set(user.matricula for user in usuarios_existentes_qs)
 
-        except Exception as e:
+        matriculas_solicitadas_set = set(matriculas_para_validar_str)
+
+        matriculas_invalidas = list(matriculas_solicitadas_set - matriculas_existentes_no_db)
+
+        matriculas_validas = list(matriculas_existentes_no_db.intersection(matriculas_solicitadas_set))
+
+        if not matriculas_invalidas:
             return Response({
-                "error": "Ocorreu um erro ao processar a solicitação."
-            },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                "all_exist": True,
+                "message": "Todas as matrículas fornecidas são válidas.",
+                "valid_ids": matriculas_validas,
+                "invalid_ids": []
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                "all_exist": False,
+                "message": f"As seguintes matrículas não foram encontradas: {', '.join(matriculas_invalidas)}",
+                "valid_ids": matriculas_validas,
+                "invalid_ids": matriculas_invalidas
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserMeView(APIView):
