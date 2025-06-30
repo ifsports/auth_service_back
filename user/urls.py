@@ -1,12 +1,11 @@
 from django.urls import path
-from . import views 
-
+from . import views
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 app_name = 'user'
 
 urlpatterns = [
-    # --- ROTA PRINCIPAL DE LOGIN SUAP (FLUXO DE REDIRECIONAMENTO) ---
-    # Esta é a URL que você foi configurada como Redirect URI no SUAP
-    # e usar no link de login do seu frontend.
+    path("api/v1/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/v1/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/suap/callback/", views.suap_oauth_callback_view, name="suap_oauth_callback"),
 
     # --- ROTAS DA API (USAM JWT GERADO PELO CALLBACK ACIMA) ---

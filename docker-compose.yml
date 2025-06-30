@@ -1,42 +1,40 @@
-# auth_service_back/docker-compose.yml
-
-version: '3.8' # Especifica a versão da sintaxe do Docker Compose
-
 services:
-  # Nome do serviço (pode ser qualquer nome, 'web' é comum para o servidor web/app)
-  web:
-    # Diz ao Docker Compose para construir a imagem a partir do Dockerfile
-    # no diretório atual (onde o docker-compose.yml está).
-    build: .
-    container_name: django_auth_service_app # Nome para o container em execução
-    command: python manage.py runserver 0.0.0.0:8000 # Comando para iniciar o servidor Django
-
-    # Mapeamento de volumes:
-    # A primeira linha mapeia seu código local para dentro do container.
-    # Mudanças no seu código local serão refletidas instantaneamente no container
-    # (ótimo para desenvolvimento, não precisa reconstruir a imagem para cada mudança no Python).
-    # A segunda linha mapeia seu arquivo db.sqlite3 local para dentro do container,
-    # garantindo que os dados do banco persistam mesmo se o container for recriado.
+  db_auth:
+    image: postgres:15
+    container_name: db_auth
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432" # Mapeia a porta do host para a porta padrão do container
     volumes:
-      - .:/app # Mapeia o diretório atual (seu projeto) para /app no container
-      - ./db.sqlite3:/app/db.sqlite3 # Persiste o banco de dados SQLite
+      - dados_postgres_auth:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
-    # Mapeamento de portas:
-    # Mapeia a porta 8000 do seu computador (host) para a porta 8000 do container.
+  # 2. SERVIÇO DA APLICAÇÃO DJANGO 
+  web:
+    build: .
+    container_name: django_auth_service_app
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
     ports:
       - "8000:8000"
-
-    # Carrega as variáveis de ambiente do arquivo .env
     env_file:
-      - .env
+      - .env # O docker-compose vai ler as variáveis do .env e passá-las
+    
+    # pendência para garantir que o banco inicie antes da aplicação
+    depends_on:
+      db_auth:
+        condition: service_healthy
 
-    # Se você não quiser usar um arquivo .env, pode definir as variáveis aqui:
-    # environment:
-    #   - SECRET_KEY=sua_secret_key_aqui
-    #   - DEBUG=True
-    #   - SUAP_CLIENT_ID=SEU_ID_REAL_DO_SUAP
-    #   - SUAP_CLIENT_SECRET=SEU_SECRET_REAL_DO_SUAP
-    #   - FRONTEND_APP_URL=http://localhost:3000
-    #   - FRONTEND_LOGIN_SUCCESS_PATH=/auth/handle-token
-    #   - FRONTEND_LOGIN_ERROR_PATH=/
-    #   - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+# ADICIONADO O VOLUME NOMEADO PARA PERSISTIR OS DADOS DO POSTGRES
+volumes:
+  dados_postgres_auth: {}
