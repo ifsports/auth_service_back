@@ -46,7 +46,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",  # <--- ADICIONE ESTA LINHA AQUI
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -86,9 +86,6 @@ DATABASES = {
 }
 
 
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -105,9 +102,6 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = "en-us"
 
 TIME_ZONE = "UTC"
@@ -118,16 +112,13 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Substitua pelo seu client secret do Keycloak
 
 SUAP_CLIENT_SECRET = os.environ.get(
     "SUAP_CLIENT_SECRET", "MpWiND3lzWJ1wXOPJebGPcMgWzsRsmP7PxlVjmYWS0Ro1BGanIoj5s0XaIBKWYYAWH4PD1syi80rAdx6JxjxywkPNz8IEO8p50k0oDZurauYWe3EwHJyptCV9Mlze57I")
@@ -140,9 +131,8 @@ AUTH_USER_MODEL = 'user.User'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # Remova ou comente a autenticação por Token padrão se for usar apenas JWT
         # 'rest_framework.authentication.TokenAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',  # Adicione esta
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -160,7 +150,7 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,  # Atualiza o last_login do usuário
 
     "ALGORITHM": "HS256",
-    "SIGNING_KEY": SECRET_KEY,  # Usa a SECRET_KEY do Django
+    "SIGNING_KEY": SECRET_KEY,
     "VERIFYING_KEY": None,
     "AUDIENCE": None,
     "ISSUER": None,
@@ -179,7 +169,7 @@ SIMPLE_JWT = {
 
     "JTI_CLAIM": "jti",
 
-    # Se você for usar o app de blacklist para invalidar tokens no logout:
+    # blacklist para invalidar tokens no logout:
     # "ROTATE_REFRESH_TOKENS": True,
     # "BLACKLIST_AFTER_ROTATION": True, # Requer que 'rest_framework_simplejwt.token_blacklist' esteja em INSTALLED_APPS
 }
