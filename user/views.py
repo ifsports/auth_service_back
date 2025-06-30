@@ -1,6 +1,6 @@
 from django.http import HttpResponseRedirect
 from django.conf import settings
-from django.urls import reverse 
+from django.urls import reverse
 from django.shortcuts import get_object_or_404
 import requests
 
@@ -11,15 +11,16 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import User  
-from .serializers import UserSerializer  
+from .models import User
+from .serializers import UserSerializer
 
 # URLs do SUAP
 SUAP_TOKEN_URL = "https://suap.ifrn.edu.br/o/token/"
 SUAP_API_EU_URL = "https://suap.ifrn.edu.br/api/eu"
-SUAP_API_MEUS_DADOS_URL = "https://suap.ifrn.edu.br/api/rh/meus-dados"
+SUAP_API_MEUS_DADOS_URL = "https://suap.ifrn.edu.br/api/edu/meus-dados-aluno"
 
 # Função auxiliar para gerar tokens JWT para o usuário
+
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -32,8 +33,10 @@ def get_tokens_for_user(user):
 # --- VIEW DE CALLBACK SUAP  ---
 def suap_oauth_callback_view(request):
     code = request.GET.get("code")
-    frontend_url_base = getattr(settings, "FRONTEND_APP_URL", "http://localhost:3000")
-    frontend_success_path = getattr(settings, "FRONTEND_LOGIN_SUCCESS_PATH", "/auth/handle-token")
+    frontend_url_base = getattr(
+        settings, "FRONTEND_APP_URL", "http://localhost:3000")
+    frontend_success_path = getattr(
+        settings, "FRONTEND_LOGIN_SUCCESS_PATH", "/auth/handle-token")
 
     # Assume que SUAP_CLIENT_ID e SUAP_CLIENT_SECRET estão configurados
     suap_client_id = settings.SUAP_CLIENT_ID
@@ -47,12 +50,12 @@ def suap_oauth_callback_view(request):
         "scope": "identificacao email documentos_pessoais",
     }
 
-    # Troca o 'code' pelo token de acesso do SUAP
     suap_token_response = requests.post(SUAP_TOKEN_URL, data=request_data_token, timeout=15)
     suap_token_response.raise_for_status()  # Levanta exceção para erros HTTP
     suap_token_data = suap_token_response.json()
 
     access_token_suap = suap_token_data.get("access_token")
+    print(f'TOKEN TOKEN TOKEN TOKEN TOKEN TOKEN{access_token_suap}')
 
     headers_suap_api = {"Authorization": f"Bearer {access_token_suap}"}
 
@@ -61,32 +64,31 @@ def suap_oauth_callback_view(request):
     response_eu.raise_for_status()
     data_eu = response_eu.json()
 
-    response_meus_dados = requests.get(SUAP_API_MEUS_DADOS_URL, headers=headers_suap_api, timeout=10)
-    response_meus_dados.raise_for_status()
-    data_meus_dados = response_meus_dados.json()
+    # response_meus_dados = requests.get(
+    #     SUAP_API_MEUS_DADOS_URL, headers=headers_suap_api, timeout=10)
+    # response_meus_dados.raise_for_status()
+    # data_meus_dados = response_meus_dados.json()
 
     # Preparar dados e criar/atualizar usuário local
-    vinculo = data_meus_dados.get('vinculo', {})
-    email_suap = (data_eu.get('email_secundario') or data_eu.get('email_academico') or
-                  data_eu.get('email_corporativo') or data_eu.get('email_pessoal') or data_eu.get('email'))
-    nome_suap = (vinculo.get('nome') or data_eu.get('nome_social') or
-                 data_eu.get('nome_usual') or data_eu.get('nome_registro'))
-    matricula_suap = data_meus_dados.get('matricula')
+    email_suap = (data_eu.get('email_google_classroom') or data_eu.get('email_academico') or data_eu.get('email_pessoal') or data_eu.get('email'))
+    nome_suap = (data_eu.get('nome_usual') or data_eu.get('nome_social') or data_eu.get('nome') or data_eu.get('nome_registro'))
+    matricula_suap = data_eu.get('identificacao')
 
     user_defaults = {
         'email': email_suap,
         'nome': nome_suap,
-        'campus': vinculo.get('campus'),
-        'foto': data_meus_dados.get('url_foto_150x200'),
+        'campus': data_eu.get('campus'),
+        'foto': data_eu.get('foto'),
         'sexo': data_eu.get('sexo', ''),
-        'tipo_usuario': data_meus_dados.get('tipo_vinculo', ''),
-        'curso': vinculo.get('curso'),
-        'situacao': vinculo.get('situacao', ''),
-        'data_nascimento': data_meus_dados.get('data_nascimento'),
+        'tipo_usuario': data_eu.get('tipo_usuario'),
+        # 'curso': data_meus_dados.get('curso'),
+        # 'situacao': data_meus_dados.get('situacao'),
+        'data_nascimento': data_eu.get('data_de_nascimento'),
     }
 
     # Cria ou atualiza o usuário.
-    user, created = User.objects.update_or_create(matricula=matricula_suap, defaults=user_defaults)
+    user, created = User.objects.update_or_create(
+        matricula=matricula_suap, defaults=user_defaults)
     action_msg = "criado" if created else "atualizado"
     print(
         f"Usuário {user.matricula} ({user.nome}) {action_msg} com sucesso via callback SUAP.")
@@ -130,7 +132,8 @@ class ValidateUsersByMatriculaView(APIView):
             )
 
         try:
-            matriculas_para_validar_str = [str(m) for m in matriculas_para_validar]
+            matriculas_para_validar_str = [
+                str(m) for m in matriculas_para_validar]
         except ValueError:
             return Response(
                 {"error": "Formato de matrícula inválido. Todas as matrículas devem ser conversíveis para string."},
@@ -144,15 +147,19 @@ class ValidateUsersByMatriculaView(APIView):
                 status=status.HTTP_200_OK
             )
 
-        usuarios_existentes_qs = User.objects.filter(matricula__in=matriculas_para_validar_str)
+        usuarios_existentes_qs = User.objects.filter(
+            matricula__in=matriculas_para_validar_str)
 
-        matriculas_existentes_no_db = set(user.matricula for user in usuarios_existentes_qs)
+        matriculas_existentes_no_db = set(
+            user.matricula for user in usuarios_existentes_qs)
 
         matriculas_solicitadas_set = set(matriculas_para_validar_str)
 
-        matriculas_invalidas = list(matriculas_solicitadas_set - matriculas_existentes_no_db)
+        matriculas_invalidas = list(
+            matriculas_solicitadas_set - matriculas_existentes_no_db)
 
-        matriculas_validas = list(matriculas_existentes_no_db.intersection(matriculas_solicitadas_set))
+        matriculas_validas = list(
+            matriculas_existentes_no_db.intersection(matriculas_solicitadas_set))
 
         if not matriculas_invalidas:
             return Response({

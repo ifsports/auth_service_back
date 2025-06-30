@@ -18,6 +18,9 @@ venv.bak/
 __pycache__/
 *.py[cod]
 *$py.class
+__pycache__/
+*.py[cod]
+
 
 # Arquivos de Banco de Dados (SQLite é comum ignorar em desenvolvimento)
 # -----------------------------------------------------------------------------
