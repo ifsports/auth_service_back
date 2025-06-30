@@ -1,4 +1,5 @@
 from django.db import migrations
+from django.contrib.auth.hashers import make_password  # <--- 1. IMPORTAR O HASHER
 import os
 
 
@@ -22,11 +23,13 @@ def create_initial_data(apps, schema_editor):
     if not User.objects.filter(matricula=ADMIN_MATRICULA).exists():
         print(f"Criando superusuário organizador: {ADMIN_EMAIL}")
 
-        admin_user = User.objects.create_superuser(
+        admin_user = User.objects.create(
             email=ADMIN_EMAIL,
             matricula=ADMIN_MATRICULA,
             nome='Organizador Padrão',
-            password=ADMIN_PASS
+            password=make_password(ADMIN_PASS),
+            is_staff=True,
+            is_superuser=True
         )
 
         admin_user.groups.add(organizador_group)
@@ -38,7 +41,7 @@ def create_initial_data(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('user', '0001_initial'),
+        ('user', '0002_alter_user_campus_alter_user_curso_alter_user_email'),
     ]
 
     operations = [
