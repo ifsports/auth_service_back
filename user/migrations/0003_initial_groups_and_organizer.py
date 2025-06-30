@@ -1,5 +1,5 @@
 from django.db import migrations
-from django.contrib.auth.hashers import make_password  # <--- 1. IMPORTAR O HASHER
+from django.contrib.auth.hashers import make_password
 import os
 
 
