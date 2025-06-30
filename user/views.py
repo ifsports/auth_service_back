@@ -3,6 +3,7 @@ from django.conf import settings
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
 import requests
+from django.contrib.auth.models import Group
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -50,7 +51,8 @@ def suap_oauth_callback_view(request):
         "scope": "identificacao email documentos_pessoais",
     }
 
-    suap_token_response = requests.post(SUAP_TOKEN_URL, data=request_data_token, timeout=15)
+    suap_token_response = requests.post(
+        SUAP_TOKEN_URL, data=request_data_token, timeout=15)
     suap_token_response.raise_for_status()  # Levanta exceção para erros HTTP
     suap_token_data = suap_token_response.json()
 
@@ -60,7 +62,8 @@ def suap_oauth_callback_view(request):
     headers_suap_api = {"Authorization": f"Bearer {access_token_suap}"}
 
     # Obter dados do usuário do SUAP
-    response_eu = requests.get(SUAP_API_EU_URL, headers=headers_suap_api, timeout=10)
+    response_eu = requests.get(
+        SUAP_API_EU_URL, headers=headers_suap_api, timeout=10)
     response_eu.raise_for_status()
     data_eu = response_eu.json()
 
@@ -70,8 +73,10 @@ def suap_oauth_callback_view(request):
     # data_meus_dados = response_meus_dados.json()
 
     # Preparar dados e criar/atualizar usuário local
-    email_suap = (data_eu.get('email_google_classroom') or data_eu.get('email_academico') or data_eu.get('email_pessoal') or data_eu.get('email'))
-    nome_suap = (data_eu.get('nome_usual') or data_eu.get('nome_social') or data_eu.get('nome') or data_eu.get('nome_registro'))
+    email_suap = (data_eu.get('email_google_classroom') or data_eu.get(
+        'email_academico') or data_eu.get('email_pessoal') or data_eu.get('email'))
+    nome_suap = (data_eu.get('nome_usual') or data_eu.get(
+        'nome_social') or data_eu.get('nome') or data_eu.get('nome_registro'))
     matricula_suap = data_eu.get('identificacao')
 
     user_defaults = {
@@ -89,6 +94,19 @@ def suap_oauth_callback_view(request):
     # Cria ou atualiza o usuário.
     user, created = User.objects.update_or_create(
         matricula=matricula_suap, defaults=user_defaults)
+
+    try:
+        # Garante que o usuário seja adicionado ao grupo "Jogador"
+        # se ele não pertencer a nenhum grupo ainda (caso de um novo usuário)
+        # ou se ele não for um Organizador.
+        if not user.groups.exists():
+            jogador_group = Group.objects.get(name='Jogador')
+            user.groups.add(jogador_group)
+            print(f"Usuário {user.matricula} adicionado ao grupo 'Jogador'.")
+    except Group.DoesNotExist:
+        # Isso só deve acontecer se a migração não tiver sido executada
+        print("AVISO: O grupo 'Jogador' não foi encontrado. Execute as migrações.")
+
     action_msg = "criado" if created else "atualizado"
     print(
         f"Usuário {user.matricula} ({user.nome}) {action_msg} com sucesso via callback SUAP.")
