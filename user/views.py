@@ -21,8 +21,6 @@ SUAP_API_EU_URL = "https://suap.ifrn.edu.br/api/eu"
 SUAP_API_MEUS_DADOS_URL = "https://suap.ifrn.edu.br/api/edu/meus-dados-aluno"
 
 # Função auxiliar para gerar tokens JWT para o usuário
-
-
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
     return {
@@ -51,8 +49,7 @@ def suap_oauth_callback_view(request):
         "scope": "identificacao email documentos_pessoais",
     }
 
-    suap_token_response = requests.post(
-        SUAP_TOKEN_URL, data=request_data_token, timeout=15)
+    suap_token_response = requests.post(SUAP_TOKEN_URL, data=request_data_token, timeout=15)
     suap_token_response.raise_for_status()  # Levanta exceção para erros HTTP
     suap_token_data = suap_token_response.json()
 
@@ -62,8 +59,7 @@ def suap_oauth_callback_view(request):
     headers_suap_api = {"Authorization": f"Bearer {access_token_suap}"}
 
     # Obter dados do usuário do SUAP
-    response_eu = requests.get(
-        SUAP_API_EU_URL, headers=headers_suap_api, timeout=10)
+    response_eu = requests.get(SUAP_API_EU_URL, headers=headers_suap_api, timeout=10)
     response_eu.raise_for_status()
     data_eu = response_eu.json()
 
@@ -91,21 +87,16 @@ def suap_oauth_callback_view(request):
         'data_nascimento': data_eu.get('data_de_nascimento'),
     }
 
-    # Cria ou atualiza o usuário.
     user, created = User.objects.update_or_create(
         matricula=matricula_suap, defaults=user_defaults)
 
     try:
-        # Garante que o usuário seja adicionado ao grupo "Jogador"
-        # se ele não pertencer a nenhum grupo ainda (caso de um novo usuário)
-        # ou se ele não for um Organizador.
         if not user.groups.exists():
             jogador_group = Group.objects.get(name='Jogador')
             user.groups.add(jogador_group)
             print(f"Usuário {user.matricula} adicionado ao grupo 'Jogador'.")
     except Group.DoesNotExist:
-        # Isso só deve acontecer se a migração não tiver sido executada
-        print("AVISO: O grupo 'Jogador' não foi encontrado. Execute as migrações.")
+        print("O grupo 'Jogador' não foi encontrado. Execute as migrações.")
 
     action_msg = "criado" if created else "atualizado"
     print(

@@ -7,7 +7,6 @@ class CustomUserManager(BaseUserManager):
         if not email:
             raise ValueError("O email é obrigatório")
         email = self.normalize_email(email)
-        # Nome é importante, então garanta que ele venha ou tenha um padrão
         nome = extra_fields.pop('nome', '')  # Pega 'nome' ou usa string vazia
         if not nome:
             # Ou defina um valor padrão se não quiser erro
@@ -35,8 +34,7 @@ class CustomUserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     matricula = models.CharField(max_length=50, unique=True)
     email = models.EmailField(unique=False)
-    nome = models.CharField(max_length=150)  # Campo nome é obrigatório
-    # blank=True e null=True para opcionais
+    nome = models.CharField(max_length=150)
     campus = models.CharField(max_length=150, blank=True, null=True)
     foto = models.URLField(blank=True, null=True)
     sexo = models.CharField(max_length=10, null=True, blank=True)
@@ -46,11 +44,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     data_nascimento = models.DateField(null=True, blank=True)
 
     is_active = models.BooleanField(default=True)
-    # Apenas admins devem ter isso True
     is_staff = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'matricula'
-    # 'nome' é importante para a criação do superusuário
     REQUIRED_FIELDS = ['email', 'nome']
 
     objects = CustomUserManager()
