@@ -15,6 +15,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User
 from .serializers import UserSerializer
 
+from messaging import send_audit_log, build_log_payload
+
 # URLs do SUAP
 SUAP_TOKEN_URL = "https://suap.ifrn.edu.br/o/token/"
 SUAP_API_EU_URL = "https://suap.ifrn.edu.br/api/eu"
@@ -117,6 +119,14 @@ def suap_oauth_callback_view(request):
     app_access_token = app_tokens['access']
     app_refresh_token = app_tokens.get('refresh')
 
+    log_payload = build_log_payload(
+        user=user,
+        event_type="auth.login",
+        operation_type="LOGIN",
+        new_data={"message": f"Usuário {user.nome} logou com sucesso via SUAP."}
+    )
+    send_audit_log(log_payload)
+
     # Redirecionar para o frontend com o token JWT da aplicação
     redirect_to_frontend_url = f"{frontend_url_base}{frontend_success_path}?token={app_access_token}"
     if app_refresh_token:
@@ -132,8 +142,14 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        print(
-            f"Usuário {request.user.matricula} solicitou logout. O cliente deve remover os tokens.")
+        user = request.user
+        log_payload = build_log_payload(
+            user=user,
+            event_type="auth.logout",
+            operation_type="LOGOUT",
+            new_data={"message": f"Usuário {user.nome} solicitou logout."}
+        )
+        send_audit_log(log_payload)
         return Response({"detail": "Logout recebido. O cliente deve invalidar/remover os tokens JWT."}, status=status.HTTP_200_OK)
 
 
