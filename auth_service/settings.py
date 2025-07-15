@@ -152,13 +152,11 @@ REST_FRAMEWORK = {
 
 
 SIMPLE_JWT = {
-    # Exemplo: token de acesso dura 1 hora
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    # Exemplo: token de refresh dura 1 dia
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": True,
-    "UPDATE_LAST_LOGIN": True,  # Atualiza o last_login do usuário
+    "UPDATE_LAST_LOGIN": True,
 
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
@@ -170,9 +168,8 @@ SIMPLE_JWT = {
 
     "AUTH_HEADER_TYPES": ("Bearer",),
     "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
-    # Ou 'matricula' se preferir identificar pelo campo matricula no token
     "USER_ID_FIELD": "id",
-    "USER_ID_CLAIM": "user_id",  # Ou 'matricula'
+    "USER_ID_CLAIM": "user_id",
 
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_TYPE_CLAIM": "token_type",

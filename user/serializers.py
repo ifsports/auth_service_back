@@ -4,7 +4,6 @@ from django.contrib.auth.models import Group
 
 
 class UserSerializer(serializers.ModelSerializer):
-    # StringRelatedField vai retornar uma lista com os nomes dos grupos. Ex: ["Jogador"]
     groups = serializers.StringRelatedField(many=True, read_only=True)
 
     class Meta:
@@ -25,7 +24,6 @@ class UserSerializer(serializers.ModelSerializer):
             'is_staff',
             'groups',
         ]
-        # Campos que são definidos pelo SUAP ou internamente e não devem ser alterados diretamente pela API.
         read_only_fields = [
             'id', 'matricula', 'email', 'is_staff', 'last_login',
             'campus', 'foto', 'sexo', 'tipo_usuario', 'curso', 'situacao', 'data_nascimento', 'groups'

@@ -21,11 +21,20 @@ SUAP_API_EU_URL = "https://suap.ifrn.edu.br/api/eu"
 SUAP_API_MEUS_DADOS_URL = "https://suap.ifrn.edu.br/api/edu/meus-dados-aluno"
 
 # Função auxiliar para gerar tokens JWT para o usuário
+
+
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
+
+    access_token = refresh.access_token
+
+    access_token['matricula'] = user.matricula
+    access_token['nome'] = user.nome
+    access_token['campus'] = user.campus
+
     return {
         'refresh': str(refresh),
-        'access': str(refresh.access_token),
+        'access': str(access_token),
     }
 
 
@@ -42,13 +51,14 @@ def suap_oauth_callback_view(request):
 
     request_data_token = {
         "grant_type": "authorization_code",
-        "code": code,  
+        "code": code,
         "client_id": suap_client_id,
         "client_secret": suap_client_secret,
         "scope": "identificacao email documentos_pessoais",
     }
 
-    suap_token_response = requests.post(SUAP_TOKEN_URL, data=request_data_token, timeout=15)
+    suap_token_response = requests.post(
+        SUAP_TOKEN_URL, data=request_data_token, timeout=15)
     suap_token_response.raise_for_status()  # Levanta exceção para erros HTTP
     suap_token_data = suap_token_response.json()
 
@@ -57,7 +67,8 @@ def suap_oauth_callback_view(request):
 
     headers_suap_api = {"Authorization": f"Bearer {access_token_suap}"}
 
-    response_eu = requests.get(SUAP_API_EU_URL, headers=headers_suap_api, timeout=10)
+    response_eu = requests.get(
+        SUAP_API_EU_URL, headers=headers_suap_api, timeout=10)
     response_eu.raise_for_status()
     data_eu = response_eu.json()
 
@@ -67,8 +78,10 @@ def suap_oauth_callback_view(request):
     # data_meus_dados = response_meus_dados.json()
 
     # Preparar dados e criar/atualizar usuário local
-    email_suap = (data_eu.get('email_google_classroom') or data_eu.get('email_academico') or data_eu.get('email_pessoal') or data_eu.get('email'))
-    nome_suap = (data_eu.get('nome_usual') or data_eu.get('nome_social') or data_eu.get('nome') or data_eu.get('nome_registro'))
+    email_suap = (data_eu.get('email_google_classroom') or data_eu.get(
+        'email_academico') or data_eu.get('email_pessoal') or data_eu.get('email'))
+    nome_suap = (data_eu.get('nome_usual') or data_eu.get(
+        'nome_social') or data_eu.get('nome') or data_eu.get('nome_registro'))
     matricula_suap = data_eu.get('identificacao')
 
     user_defaults = {
@@ -92,13 +105,13 @@ def suap_oauth_callback_view(request):
             user.groups.add(jogador_group)
             print(f"Usuário {user.matricula} adicionado ao grupo 'Jogador'.")
     except Group.DoesNotExist:
-        print("O grupo 'Jogador' não foi encontrado. Execute as migrações.")
+        print("O grupo 'Jogador' não foi encontrado.")
 
     action_msg = "criado" if created else "atualizado"
     print(
         f"Usuário {user.matricula} ({user.nome}) {action_msg} com sucesso via callback SUAP.")
 
-    # Gerar token JWT 
+    # Gerar token JWT
     app_tokens = get_tokens_for_user(user)
     app_access_token = app_tokens['access']
     app_refresh_token = app_tokens.get('refresh')
