@@ -31,6 +31,7 @@ def get_tokens_for_user(user):
     access_token['matricula'] = user.matricula
     access_token['nome'] = user.nome
     access_token['campus'] = user.campus
+    access_token['groups'] = [group.name for group in user.groups.all()]
 
     return {
         'refresh': str(refresh),
