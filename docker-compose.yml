@@ -2,39 +2,34 @@ services:
   db_auth:
     image: postgres:15
     container_name: db_auth
-    restart: always
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     ports:
-      - "5436:5432" # Mapeia a porta do host para a porta padrão do container
+      - "5436:5432"
     volumes:
       - dados_postgres_auth:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+    networks:
+      - orquestrador-net
 
-  # 2. SERVIÇO DA APLICAÇÃO DJANGO 
-  web:
+  auth_service:
     build: .
-    container_name: django_auth_service_app
+    container_name: auth_service_app
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/app
     ports:
       - "8000:8000"
-    env_file:
-      - .env # O docker-compose vai ler as variáveis do .env e passá-las
-    
-    # pendência para garantir que o banco inicie antes da aplicação
+    env_file: .env
     depends_on:
-      db_auth:
-        condition: service_healthy
+      - db_auth
+    networks:
+      - orquestrador-net
 
-# ADICIONADO O VOLUME NOMEADO PARA PERSISTIR OS DADOS DO POSTGRES
 volumes:
-  dados_postgres_auth: {}
+  dados_postgres_auth:
+
+networks:
+  orquestrador-net:
+    external: true
