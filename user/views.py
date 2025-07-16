@@ -120,9 +120,10 @@ def suap_oauth_callback_view(request):
     app_refresh_token = app_tokens.get('refresh')
 
     log_payload = build_log_payload(
+        request=request,
         user=user,
         event_type="auth.login",
-        operation_type="LOGIN",
+        operation_type="LOGOUT",
         new_data={"message": f"Usuário {user.nome} logou com sucesso via SUAP."}
     )
     send_audit_log(log_payload)
@@ -144,6 +145,7 @@ class LogoutView(APIView):
     def post(self, request, *args, **kwargs):
         user = request.user
         log_payload = build_log_payload(
+            request=request,
             user=user,
             event_type="auth.logout",
             operation_type="LOGOUT",
