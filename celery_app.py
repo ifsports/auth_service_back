@@ -1,16 +1,34 @@
 from celery import Celery
+from kombu import Exchange, Queue
 import os
 
-# Pega a URL do RabbitMQ a partir das variáveis de ambiente
-rabbitmq_url = os.getenv('RABBITMQ_URL', 'amqp://user:password@rabbitmq:5672/')
+rabbitmq_url = os.getenv('RABBITMQ_URL', 'amqp://guest:guest@rabbitmq:5672/')
 
-# Cria uma instância Celery simples apenas para ENVIAR tarefas.
-# O nome 'auth_tasks' é apenas um identificador local.
 celery_app = Celery('auth_tasks', broker=rabbitmq_url)
 
-# Configurações para garantir que a comunicação funcione
+# Define a exchange e a fila exatamente como no audit-service.
+events_exchange = Exchange('events_exchange', type='topic')
+audit_queue = Queue(
+    'audit_queue',
+    events_exchange,
+    routing_key='#'
+)
+
+celery_app.conf.task_queues = (audit_queue,)
+
 celery_app.conf.update(
     task_serializer='json',
     accept_content=['json'],
     result_serializer='json',
 )
+
+# Força a declaração da exchange e da fila na inicialização do django.
+try:
+    with celery_app.connection_for_write() as conn:
+        # A declaração da fila também declara a exchange à qual ela está ligada.
+        audit_queue.declare(channel=conn.channel())
+        print(
+            ">>> [Celery Producer] Exchange 'events_exchange' e Fila 'audit_queue' declaradas com sucesso. <<<")
+except Exception as e:
+    print(
+        f">>> [Celery Producer] AVISO: Não foi possível declarar a fila na inicialização. Celery tentará novamente. Erro: {e} <<<")

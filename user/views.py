@@ -65,7 +65,7 @@ def suap_oauth_callback_view(request):
     suap_token_data = suap_token_response.json()
 
     access_token_suap = suap_token_data.get("access_token")
-    print(f'TOKEN TOKEN TOKEN TOKEN TOKEN TOKEN{access_token_suap}')
+    # print(f'TOKEN TOKEN TOKEN TOKEN TOKEN TOKEN{access_token_suap}')
 
     headers_suap_api = {"Authorization": f"Bearer {access_token_suap}"}
 
@@ -105,13 +105,14 @@ def suap_oauth_callback_view(request):
         if not user.groups.exists():
             jogador_group = Group.objects.get(name='Jogador')
             user.groups.add(jogador_group)
-            print(f"Usuário {user.matricula} adicionado ao grupo 'Jogador'.")
+            # print(f"Usuário {user.matricula} adicionado ao grupo 'Jogador'.")
     except Group.DoesNotExist:
-        print("O grupo 'Jogador' não foi encontrado.")
+        pass
+        # print("O grupo 'Jogador' não foi encontrado.")
 
-    action_msg = "criado" if created else "atualizado"
-    print(
-        f"Usuário {user.matricula} ({user.nome}) {action_msg} com sucesso via callback SUAP.")
+    # action_msg = "criado" if created else "atualizado"
+    # print(
+    #     f"Usuário {user.matricula} ({user.nome}) {action_msg} com sucesso via callback SUAP.")
 
     app_tokens = get_tokens_for_user(user)
     app_access_token = app_tokens['access']
@@ -123,8 +124,7 @@ def suap_oauth_callback_view(request):
         redirect_to_frontend_url += f"&refresh_token={app_refresh_token}"
     redirect_to_frontend_url += f"&user_created={str(created).lower()}"
 
-    print(f"Redirecionando para o frontend: {redirect_to_frontend_url}")
-    print('TESTANDO ESPELHAMENTO TESTANDO ESPELHAMENTO TESTANDO ESPELHAMENTO TESTANDO ESPELHAMENTO')
+    # print(f"Redirecionando para o frontend: {redirect_to_frontend_url}")
     log_payload = build_log_payload(
         request=request,
         user=user,
@@ -144,24 +144,29 @@ class LoginView(APIView):
     def post(self, request, *args, **kwargs):
         matricula = request.data.get('matricula')
         password = request.data.get('password')
-
-        if not matricula or not password:
-            return Response(
-                {"error": "Matrícula e senha são obrigatórios."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         user = authenticate(username=matricula, password=password)
 
-        if user:
-            if user.is_active:
-                tokens = get_tokens_for_user(user)
-                return Response(tokens, status=status.HTTP_200_OK)
-            else:
-                return Response(
-                    {"error": "Esta conta está desativada."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
+        if user and user.is_active:
+            tokens = get_tokens_for_user(user)
+
+            log_payload = build_log_payload(
+                request=request,
+                user=user,
+                event_type="auth.login",
+                operation_type="LOGIN",
+                new_data={
+                    "message": f"Organizador {user.nome} logou com sucesso."}
+            )
+
+            send_audit_log(log_payload)
+
+            return Response(tokens, status=status.HTTP_200_OK)
+
+        elif user and not user.is_active:
+            return Response(
+                {"error": "Esta conta está desativada."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         else:
             return Response(
                 {"error": "Credenciais inválidas."},

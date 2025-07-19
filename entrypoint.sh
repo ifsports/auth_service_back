@@ -1,3 +1,5 @@
+#!/bin/sh
+
 echo "Aplicando migrações do banco de dados..."
 python manage.py migrate --no-input
 
