@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.shortcuts import get_object_or_404
 import requests
 from django.contrib.auth.models import Group
+from django.contrib.auth import authenticate
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -19,10 +20,8 @@ from messaging import send_audit_log, build_log_payload
 
 # URLs do SUAP
 SUAP_TOKEN_URL = "https://suap.ifrn.edu.br/o/token/"
-SUAP_API_EU_URL = "https://suap.ifrn.edu.br/api/eu"
+SUAP_API_EU_URL = "https://suap.ifrn.edu.br/api/rh/eu"
 SUAP_API_MEUS_DADOS_URL = "https://suap.ifrn.edu.br/api/edu/meus-dados-aluno"
-
-# Função auxiliar para gerar tokens JWT para o usuário
 
 
 def get_tokens_for_user(user):
@@ -114,11 +113,18 @@ def suap_oauth_callback_view(request):
     print(
         f"Usuário {user.matricula} ({user.nome}) {action_msg} com sucesso via callback SUAP.")
 
-    # Gerar token JWT
     app_tokens = get_tokens_for_user(user)
     app_access_token = app_tokens['access']
     app_refresh_token = app_tokens.get('refresh')
 
+    # Redirecionar para o frontend com o token JWT da aplicação
+    redirect_to_frontend_url = f"{frontend_url_base}{frontend_success_path}?token={app_access_token}"
+    if app_refresh_token:
+        redirect_to_frontend_url += f"&refresh_token={app_refresh_token}"
+    redirect_to_frontend_url += f"&user_created={str(created).lower()}"
+
+    print(f"Redirecionando para o frontend: {redirect_to_frontend_url}")
+    print('TESTANDO ESPELHAMENTO TESTANDO ESPELHAMENTO TESTANDO ESPELHAMENTO TESTANDO ESPELHAMENTO')
     log_payload = build_log_payload(
         request=request,
         user=user,
@@ -128,17 +134,41 @@ def suap_oauth_callback_view(request):
     )
     send_audit_log(log_payload)
 
-    # Redirecionar para o frontend com o token JWT da aplicação
-    redirect_to_frontend_url = f"{frontend_url_base}{frontend_success_path}?token={app_access_token}"
-    if app_refresh_token:
-        redirect_to_frontend_url += f"&refresh_token={app_refresh_token}"
-    redirect_to_frontend_url += f"&user_created={str(created).lower()}"
-
-    print(f"Redirecionando para o frontend: {redirect_to_frontend_url}")
     return HttpResponseRedirect(redirect_to_frontend_url)
 
 
 # --- OUTRAS API VIEWS (Logout, UserMe, UserDetail) ---
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        matricula = request.data.get('matricula')
+        password = request.data.get('password')
+
+        if not matricula or not password:
+            return Response(
+                {"error": "Matrícula e senha são obrigatórios."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = authenticate(username=matricula, password=password)
+
+        if user:
+            if user.is_active:
+                tokens = get_tokens_for_user(user)
+                return Response(tokens, status=status.HTTP_200_OK)
+            else:
+                return Response(
+                    {"error": "Esta conta está desativada."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        else:
+            return Response(
+                {"error": "Credenciais inválidas."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
