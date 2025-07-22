@@ -85,6 +85,7 @@ def suap_oauth_callback_view(request):
     nome_suap = (data_eu.get('nome_usual') or data_eu.get(
         'nome_social') or data_eu.get('nome') or data_eu.get('nome_registro'))
     matricula_suap = data_eu.get('identificacao')
+    image_suap = data_eu.get('foto')
 
     user_defaults = {
         'email': email_suap,
@@ -119,10 +120,18 @@ def suap_oauth_callback_view(request):
     app_refresh_token = app_tokens.get('refresh')
 
     # Redirecionar para o frontend com o token JWT da aplicação
-    redirect_to_frontend_url = f"{frontend_url_base}{frontend_success_path}?token={app_access_token}"
+    redirect_to_frontend_url = (
+        f"{frontend_url_base}{frontend_success_path}"
+        f"?token={app_access_token}"
+    )
     if app_refresh_token:
         redirect_to_frontend_url += f"&refresh_token={app_refresh_token}"
     redirect_to_frontend_url += f"&user_created={str(created).lower()}"
+
+    redirect_to_frontend_url += f"&userId={matricula_suap}"
+    redirect_to_frontend_url += f"&userEmail={email_suap}"
+    redirect_to_frontend_url += f"&userName={nome_suap}"
+    redirect_to_frontend_url += f"&userImage={image_suap}"
 
     # print(f"Redirecionando para o frontend: {redirect_to_frontend_url}")
     log_payload = build_log_payload(
