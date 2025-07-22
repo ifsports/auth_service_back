@@ -3,6 +3,7 @@ from django.conf import settings
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
 import requests
+from urllib.parse import quote
 from django.contrib.auth.models import Group
 from django.contrib.auth import authenticate
 
@@ -10,7 +11,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
-
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
@@ -18,10 +18,11 @@ from .serializers import UserSerializer
 
 from messaging import send_audit_log, build_log_payload
 
-# URLs do SUAP
+from concurrent.futures import ThreadPoolExecutor
+
 SUAP_TOKEN_URL = "https://suap.ifrn.edu.br/o/token/"
 SUAP_API_EU_URL = "https://suap.ifrn.edu.br/api/rh/eu"
-SUAP_API_MEUS_DADOS_URL = "https://suap.ifrn.edu.br/api/edu/meus-dados-aluno"
+SUAP_API_MEUS_DADOS_URL = "https://suap.ifrn.edu.br/api/v2/minhas-informacoes/meus-dados/"
 
 
 def get_tokens_for_user(user):
@@ -40,7 +41,6 @@ def get_tokens_for_user(user):
     }
 
 
-# --- VIEW DE CALLBACK SUAP  ---
 def suap_oauth_callback_view(request):
     code = request.GET.get("code")
     frontend_url_base = getattr(
@@ -48,105 +48,97 @@ def suap_oauth_callback_view(request):
     frontend_success_path = getattr(
         settings, "FRONTEND_LOGIN_SUCCESS_PATH", "/auth/handle-token")
 
-    suap_client_id = settings.SUAP_CLIENT_ID
-    suap_client_secret = settings.SUAP_CLIENT_SECRET
-
     request_data_token = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "client_id": suap_client_id,
-        "client_secret": suap_client_secret,
+        "grant_type": "authorization_code", "code": code,
+        "client_id": settings.SUAP_CLIENT_ID, "client_secret": settings.SUAP_CLIENT_SECRET,
         "scope": "identificacao email documentos_pessoais",
     }
-
     suap_token_response = requests.post(
         SUAP_TOKEN_URL, data=request_data_token, timeout=15)
-    suap_token_response.raise_for_status()  # Levanta exceção para erros HTTP
+    suap_token_response.raise_for_status()
     suap_token_data = suap_token_response.json()
-
     access_token_suap = suap_token_data.get("access_token")
-    # print(f'TOKEN TOKEN TOKEN TOKEN TOKEN TOKEN{access_token_suap}')
-
     headers_suap_api = {"Authorization": f"Bearer {access_token_suap}"}
 
-    response_eu = requests.get(
-        SUAP_API_EU_URL, headers=headers_suap_api, timeout=10)
-    response_eu.raise_for_status()
-    data_eu = response_eu.json()
+    # 2. BUSCA OS DADOS DO USUÁRIO EM PARALELO PARA GANHAR VELOCIDADE
+    data_suap = {}
+    data_eu = {}
+    with ThreadPoolExecutor() as executor:
+        # Dispara as duas requisições ao mesmo tempo
+        future_meus_dados = executor.submit(
+            requests.get, SUAP_API_MEUS_DADOS_URL, headers=headers_suap_api, timeout=10)
+        future_eu = executor.submit(
+            requests.get, SUAP_API_EU_URL, headers=headers_suap_api, timeout=10)
 
-    # response_meus_dados = requests.get(
-    #     SUAP_API_MEUS_DADOS_URL, headers=headers_suap_api, timeout=10)
-    # response_meus_dados.raise_for_status()
-    # data_meus_dados = response_meus_dados.json()
+        # Espera os resultados e trata possíveis erros
+        try:
+            response_meus_dados = future_meus_dados.result()
+            if response_meus_dados.status_code == 200:
+                data_suap = response_meus_dados.json()
+        except Exception as e:
+            print(f"AVISO: Falha ao buscar dados da API MEUS_DADOS: {e}")
 
-    # Preparar dados e criar/atualizar usuário local
-    email_suap = (data_eu.get('email_google_classroom') or data_eu.get(
-        'email_academico') or data_eu.get('email_pessoal') or data_eu.get('email'))
-    nome_suap = (data_eu.get('nome_usual') or data_eu.get(
-        'nome_social') or data_eu.get('nome') or data_eu.get('nome_registro'))
-    matricula_suap = data_eu.get('identificacao')
-    image_suap = data_eu.get('foto')
+        try:
+            response_eu = future_eu.result()
+            if response_eu.status_code == 200:
+                data_eu = response_eu.json()
+        except Exception as e:
+            print(f"AVISO: Falha ao buscar dados da API EU: {e}")
+
+    # 3. COMBINA OS DADOS E SALVA O USUÁRIO
+    matricula_suap = data_suap.get('matricula')
+    if not matricula_suap:
+        return HttpResponseRedirect(f"{frontend_url_base}/login?error=falha_suap")
+
+    vinculo_data = data_suap.get('vinculo', {})
 
     user_defaults = {
-        'email': email_suap,
-        'nome': nome_suap,
-        'campus': data_eu.get('campus'),
-        'foto': data_eu.get('foto'),
-        'sexo': data_eu.get('sexo', ''),
-        'tipo_usuario': data_eu.get('tipo_usuario'),
-        # 'curso': data_meus_dados.get('curso'),
-        # 'situacao': data_meus_dados.get('situacao'),
-        'data_nascimento': data_eu.get('data_de_nascimento'),
+        'email': data_suap.get('email'),
+        'nome': data_suap.get('nome_usual'),
+        'campus': vinculo_data.get('campus'),
+        'foto': data_suap.get('url_foto_75x100', ''),
+        'sexo': data_eu.get('sexo'),
+        'tipo_usuario': data_suap.get('tipo_vinculo'),
+        'curso': vinculo_data.get('curso'),
+        'situacao': vinculo_data.get('situacao'),
+        'data_nascimento': data_suap.get('data_nascimento'),
     }
 
     user, created = User.objects.update_or_create(
         matricula=matricula_suap, defaults=user_defaults)
 
-    try:
-        if not user.groups.exists():
+    if not user.groups.exists():
+        try:
             jogador_group = Group.objects.get(name='Jogador')
             user.groups.add(jogador_group)
-            # print(f"Usuário {user.matricula} adicionado ao grupo 'Jogador'.")
-    except Group.DoesNotExist:
-        pass
-        # print("O grupo 'Jogador' não foi encontrado.")
-
-    # action_msg = "criado" if created else "atualizado"
-    # print(
-    #     f"Usuário {user.matricula} ({user.nome}) {action_msg} com sucesso via callback SUAP.")
+        except Group.DoesNotExist:
+            print("AVISO: O grupo 'Jogador' não foi encontrado.")
 
     app_tokens = get_tokens_for_user(user)
-    app_access_token = app_tokens['access']
-    app_refresh_token = app_tokens.get('refresh')
-
-    # Redirecionar para o frontend com o token JWT da aplicação
-    redirect_to_frontend_url = (
+    nome_formatado = quote(user_defaults.get('nome') or '')
+    email_formatado = quote(user_defaults.get('email') or '')
+    foto_formatada = quote(user_defaults.get('foto') or '')
+    redirect_url = (
         f"{frontend_url_base}{frontend_success_path}"
-        f"?token={app_access_token}"
+        f"?token={app_tokens['access']}&refresh_token={app_tokens['refresh']}"
+        f"&user_created={str(created).lower()}&userId={matricula_suap}"
+        f"&userName={nome_formatado}&userEmail={email_formatado}"
+        f"&userImage={foto_formatada}"
     )
-    if app_refresh_token:
-        redirect_to_frontend_url += f"&refresh_token={app_refresh_token}"
-    redirect_to_frontend_url += f"&user_created={str(created).lower()}"
 
-    redirect_to_frontend_url += f"&userId={matricula_suap}"
-    redirect_to_frontend_url += f"&userEmail={email_suap}"
-    redirect_to_frontend_url += f"&userName={nome_suap}"
-    redirect_to_frontend_url += f"&userImage={image_suap}"
-
-    # print(f"Redirecionando para o frontend: {redirect_to_frontend_url}")
     log_payload = build_log_payload(
         request=request,
         user=user,
         event_type="auth.login",
-        operation_type="LOGOUT",
-        new_data={"message": f"Usuário {user.nome} logou com sucesso via SUAP."}
+        operation_type="LOGIN",
+        new_data={
+            "message": f"Usuário {user.nome} ({user.matricula}) logou com sucesso via SUAP."}
     )
     send_audit_log(log_payload)
 
-    return HttpResponseRedirect(redirect_to_frontend_url)
+    return HttpResponseRedirect(redirect_url)
 
 
-# --- OUTRAS API VIEWS (Logout, UserMe, UserDetail) ---
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
