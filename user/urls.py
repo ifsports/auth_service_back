@@ -13,6 +13,6 @@ urlpatterns = [
     # --- ROTAS DA API (protegidas por JWT) ---
     path("api/v1/auth/logout/", views.LogoutView.as_view(), name="api_logout"),
     path("api/v1/auth/users/me/", views.UserMeView.as_view(), name="api_user_me"),
-    path("api/v1/auth/users/<int:id>/", views.UserDetailView.as_view(), name="api_user_detail"),
+    path("api/v1/auth/users/<str:id>/", views.UserDetailView.as_view(), name="api_user_detail"),
     path("api/v1/auth/users/", views.ValidateUsersByMatriculaView.as_view(), name="api_user_list"),
 ]

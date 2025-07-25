@@ -258,9 +258,9 @@ class UserMeView(APIView):
 
 
 class UserDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, id, *args, **kwargs):
-        user = get_object_or_404(User, id=id)
+        user = get_object_or_404(User, matricula=id)
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
