@@ -34,6 +34,7 @@ def get_tokens_for_user(user):
     access_token['nome'] = user.nome
     access_token['campus'] = user.campus
     access_token['groups'] = [group.name for group in user.groups.all()]
+    access_token['iss'] = 'ifsports-recomeco'
 
     return {
         'refresh': str(refresh),
