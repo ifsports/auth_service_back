@@ -264,3 +264,20 @@ class UserDetailView(APIView):
         user = get_object_or_404(User, matricula=id)
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UsersByIdView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        ids = request.data.get("ids", [])
+
+        if not isinstance(ids, list) or not ids:
+            return Response({
+                "detail": "Uma lista de IDs é obrigatória."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        users = User.objects.filter(matricula__in=ids)
+        serializer = UserSerializer(users, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
