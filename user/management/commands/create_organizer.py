@@ -39,19 +39,23 @@ class Command(BaseCommand):
         # Garante que o grupo "Jogador" existe
         Group.objects.get_or_create(name='Jogador')
 
-        # Cria o novo usuário organizador
         try:
-            user = User.objects.create_superuser(
+
+            user = User.objects.create_user(
                 matricula=matricula,
                 email=email,
                 nome=nome,
-                password=make_password(password),
+                password=password,
                 campus=campus_code,
             )
+            user.is_staff = True
+            user.is_superuser = True
+            user.save()
+
             user.groups.add(organizador_group)
 
             self.stdout.write(self.style.SUCCESS(
-                f'Usuário organizador "{nome}" criado com sucesso!'
+                f'Usuário organizador "{nome}" (com permissão de superusuário) criado com sucesso!'
             ))
         except Exception as e:
             self.stderr.write(self.style.ERROR(
