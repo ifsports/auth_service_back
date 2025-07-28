@@ -32,6 +32,7 @@ def get_secret(secret_name, default=None):
 SECRET_KEY = get_secret('SECRET_KEY')
 DB_PASSWORD = get_secret('DB_PASSWORD')
 SUAP_CLIENT_SECRET = get_secret('SUAP_CLIENT_SECRET')
+JWT_SIGNING_KEY = get_secret('JWT_SIGNING_KEY')  # <-- ADICIONE ESTA LINHA
 
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
@@ -109,7 +110,7 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
     "ALGORITHM": "HS256",
-    "SIGNING_KEY": SECRET_KEY,  # Reutilizando a SECRET_KEY para assinar o JWT
+    "SIGNING_KEY": JWT_SIGNING_KEY,
     "VERIFYING_KEY": None, "AUDIENCE": None, "ISSUER": None, "JWK_URL": None, "LEEWAY": 0,
     "AUTH_HEADER_TYPES": ("Bearer",), "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
     "USER_ID_FIELD": "id", "USER_ID_CLAIM": "user_id",
