@@ -21,5 +21,5 @@ if [ -n "$INITIAL_CAMPUS_CODES" ]; then
 else
   echo "Nenhum campus inicial para provisionar."
 fi
-
+#
 exec "$@"
