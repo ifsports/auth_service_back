@@ -41,13 +41,12 @@ class Command(BaseCommand):
 
         # Cria o novo usuário organizador
         try:
-            user = User.objects.create(
+            user = User.objects.create_superuser(
                 matricula=matricula,
                 email=email,
                 nome=nome,
                 password=make_password(password),
                 campus=campus_code,
-                is_staff=True,
             )
             user.groups.add(organizador_group)
 
