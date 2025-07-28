@@ -1,62 +1,59 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import Group
-from django.contrib.auth.hashers import make_password
 from user.models import User
 import os
 
 
 class Command(BaseCommand):
-    help = 'Cria um usuário Organizador para um campus específico.'
-
-    def add_arguments(self, parser):
-        parser.add_argument('--campus', type=str,
-                            help='Código do campus (ex: PF, CN)', required=True)
-        parser.add_argument('--email', type=str,
-                            help='Email para o novo organizador', required=True)
-        parser.add_argument('--password', type=str,
-                            help='Senha para o novo organizador', required=True)
+    help = 'Cria os usuários Organizadores iniciais com base na variável de ambiente INITIAL_CAMPUS_CODES.'
 
     def handle(self, *args, **options):
-        campus_code = options['campus'].upper()
-        email = options['email']
-        password = options['password']
+        initial_campus_codes = os.environ.get('INITIAL_CAMPUS_CODES')
+        default_password = os.environ.get('DEFAULT_ORGANIZER_PASS')
 
-        matricula = f'organizador_{campus_code}'.lower()
-        nome = f'Organizador {campus_code}'
-
-        if User.objects.filter(matricula=matricula).exists():
-            self.stdout.write(self.style.NOTICE(
-                f'Organizador para o campus {campus_code} já existe.'))
+        if not initial_campus_codes or not default_password:
+            self.stdout.write(self.style.WARNING(
+                'Variáveis INITIAL_CAMPUS_CODES ou DEFAULT_ORGANIZER_PASS não definidas. Nenhum organizador será criado.'))
             return
 
-        # Garante que o grupo "Organizador" existe
-        organizador_group, created = Group.objects.get_or_create(
-            name='Organizador')
-        if created:
-            self.stdout.write(self.style.SUCCESS(
-                'Grupo "Organizador" criado.'))
+        self.stdout.write("Verificando e criando organizadores iniciais...")
 
-        # Garante que o grupo "Jogador" existe
+        # Garante que os grupos existem antes do loop
+        organizador_group, _ = Group.objects.get_or_create(name='Organizador')
         Group.objects.get_or_create(name='Jogador')
 
-        try:
+        campus_list = [code.strip()
+                       for code in initial_campus_codes.split(',') if code.strip()]
 
-            user = User.objects.create_user(
-                matricula=matricula,
-                email=email,
-                nome=nome,
-                password=password,
-                campus=campus_code,
-            )
-            user.is_staff = True
-            user.is_superuser = True
-            user.save()
+        for campus_code in campus_list:
+            campus_code_upper = campus_code.upper()
+            matricula = f'organizador_{campus_code_upper}'.lower()
+            nome = f'Organizador {campus_code_upper}'
+            email = f'organizador.{matricula}@ifrn.edu.br'
 
-            user.groups.add(organizador_group)
+            if User.objects.filter(matricula=matricula).exists():
+                self.stdout.write(self.style.NOTICE(
+                    f'Organizador para o campus {campus_code_upper} já existe.'))
+                continue  # Pula para o próximo
 
-            self.stdout.write(self.style.SUCCESS(
-                f'Usuário organizador "{nome}" (com permissão de superusuário) criado com sucesso!'
-            ))
-        except Exception as e:
-            self.stderr.write(self.style.ERROR(
-                f'Erro ao criar organizador: {e}'))
+            try:
+                user = User.objects.create_user(
+                    matricula=matricula,
+                    email=email,
+                    nome=nome,
+                    password=default_password,
+                    campus=campus_code_upper,
+                )
+                user.is_staff = True
+                user.is_superuser = True
+                user.save()
+                user.groups.add(organizador_group)
+                self.stdout.write(self.style.SUCCESS(
+                    f'--> Usuário "{nome}" criado com sucesso!'
+                ))
+            except Exception as e:
+                self.stderr.write(self.style.ERROR(
+                    f'--> Erro ao criar organizador para {campus_code_upper}: {e}'))
+
+        self.stdout.write(self.style.SUCCESS(
+            'Criação de organizadores concluída.'))
