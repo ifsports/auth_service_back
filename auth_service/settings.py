@@ -32,7 +32,7 @@ def get_secret(secret_name, default=None):
 SECRET_KEY = get_secret('SECRET_KEY')
 DB_PASSWORD = get_secret('DB_PASSWORD')
 SUAP_CLIENT_SECRET = get_secret('SUAP_CLIENT_SECRET')
-JWT_SIGNING_KEY = get_secret('JWT_SIGNING_KEY')  # <-- ADICIONE ESTA LINHA
+JWT_SIGNING_KEY = get_secret('JWT_SECRET_KEY') 
 
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
