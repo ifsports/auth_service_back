@@ -1,48 +1,22 @@
-name: Deploy do Serviço de Autenticação na AWS
+name: Deploy Microservice Update to VM
 
 on:
   push:
-    branches: ["master"]
-
-env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: auth-service
-  APP_RUNNER_SERVICE_ARN: arn:aws:apprunner:us-east-1:248678919061:service/auth-web-service/369d2d05c0b14a698788d9ce7382c586
+    branches:
+      - master
+      - main
 
 jobs:
   deploy:
-    name: Build e Deploy
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. Checkout do código
-        uses: actions/checkout@v3
-
-      - name: 2. Configurar credenciais da AWS
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Trigger deploy script on VM
+        uses: appleboy/ssh-action@master
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: 3. Login no Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: 4. Build, Tag e Push da imagem Docker para o ECR
-        id: build-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          # Constrói a imagem sem usar cache, como você prefere
-          docker build --no-cache -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-
-          # Adiciona a tag 'latest' à mesma imagem. É isso que aciona o App Runner.
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-          # Envia a tag única para o ECR (bom para histórico)
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-          # Envia a tag 'latest' para o ECR (ESSENCIAL para o deploy automático)
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Executa o script universal que atualiza TUDO
+            ~/deploy.sh
