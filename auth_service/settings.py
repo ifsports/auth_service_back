@@ -32,7 +32,7 @@ def get_secret(secret_name, default=None):
 SECRET_KEY = get_secret('SECRET_KEY')
 DB_PASSWORD = get_secret('DB_PASSWORD')
 SUAP_CLIENT_SECRET = get_secret('SUAP_CLIENT_SECRET')
-JWT_SIGNING_KEY = get_secret('JWT_SECRET_KEY') 
+JWT_SIGNING_KEY = get_secret('JWT_SECRET_KEY')
 
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
@@ -44,9 +44,16 @@ CSRF_TRUSTED_ORIGINS = os.environ.get(
     'DJANGO_CSRF_TRUSTED_ORIGINS', 'http://localhost:8000').split(',')
 
 INSTALLED_APPS = [
-    "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
-    "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
-    'user', 'rest_framework', 'rest_framework_simplejwt', 'corsheaders',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    'user', 'rest_framework',
+    'rest_framework_simplejwt',
+    'corsheaders',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -100,7 +107,20 @@ SUAP_CLIENT_ID = os.environ.get("SUAP_CLIENT_ID")
 # --- JWT ---
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
-    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',)
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'API de Autenticação - IFSports',
+    'DESCRIPTION': 'Serviço de autenticação e usuários.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # Força a UI do Swagger a usar a URL completa e correta para buscar o schema
+    'SWAGGER_UI_SETTINGS': {
+        'url': '/auth/api/schema/',
+    },
 }
 
 SIMPLE_JWT = {
