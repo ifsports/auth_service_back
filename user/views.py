@@ -14,14 +14,11 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
-from .serializers import UserSerializer, LoginRequestSerializer, TokenResponseSerializer, MatriculasRequestSerializer
+from .serializers import UserSerializer
 
 from messaging import send_audit_log, build_log_payload
 
 from concurrent.futures import ThreadPoolExecutor
-
-from drf_spectacular.utils import extend_schema, OpenApiResponse
-
 
 SUAP_TOKEN_URL = "https://suap.ifrn.edu.br/o/token/"
 SUAP_API_EU_URL = "https://suap.ifrn.edu.br/api/rh/eu"
@@ -45,7 +42,6 @@ def get_tokens_for_user(user):
     }
 
 
-@extend_schema(exclude=True)
 def suap_oauth_callback_view(request):
     code = request.GET.get("code")
     frontend_url_base = getattr(
@@ -65,14 +61,17 @@ def suap_oauth_callback_view(request):
     access_token_suap = suap_token_data.get("access_token")
     headers_suap_api = {"Authorization": f"Bearer {access_token_suap}"}
 
+    # 2. BUSCA OS DADOS DO USUÁRIO EM PARALELO PARA GANHAR VELOCIDADE
     data_suap = {}
     data_eu = {}
     with ThreadPoolExecutor() as executor:
+        # Dispara as duas requisições ao mesmo tempo
         future_meus_dados = executor.submit(
             requests.get, SUAP_API_MEUS_DADOS_URL, headers=headers_suap_api, timeout=10)
         future_eu = executor.submit(
             requests.get, SUAP_API_EU_URL, headers=headers_suap_api, timeout=10)
 
+        # Espera os resultados e trata possíveis erros
         try:
             response_meus_dados = future_meus_dados.result()
             if response_meus_dados.status_code == 200:
@@ -87,6 +86,7 @@ def suap_oauth_callback_view(request):
         except Exception as e:
             print(f"AVISO: Falha ao buscar dados da API EU: {e}")
 
+    # 3. COMBINA OS DADOS E SALVA O USUÁRIO
     matricula_suap = data_suap.get('matricula')
     if not matricula_suap:
         return HttpResponseRedirect(f"{frontend_url_base}/login?error=falha_suap")
@@ -141,23 +141,8 @@ def suap_oauth_callback_view(request):
 
 
 class LoginView(APIView):
-    """
-    Endpoint para autenticação de organizadores via matrícula e senha.
-    Não é utilizado por alunos/jogadores, que devem logar via SUAP.
-    """
     permission_classes = [AllowAny]
 
-    @extend_schema(
-        tags=["Autenticação"],
-        summary="Autentica um organizador",
-        description="Recebe matrícula e senha e, em caso de sucesso, retorna os tokens de acesso e refresh.",
-        request=LoginRequestSerializer,
-        responses={
-            200: TokenResponseSerializer,
-            401: OpenApiResponse(description="Credenciais inválidas."),
-            403: OpenApiResponse(description="Esta conta está desativada.")
-        }
-    )
     def post(self, request, *args, **kwargs):
         matricula = request.data.get('matricula')
         password = request.data.get('password')
@@ -192,20 +177,8 @@ class LoginView(APIView):
 
 
 class LogoutView(APIView):
-    """
-    Endpoint para registrar o evento de logout do usuário.
-    """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        tags=["Autenticação"],
-        summary="Registra o logout do usuário",
-        description="Esta rota não invalida o token JWT. O cliente (frontend) é responsável por apagar os tokens armazenados localmente.",
-        request=None,
-        responses={
-            200: OpenApiResponse(description="Logout recebido. O cliente deve apagar os tokens."),
-        }
-    )
     def post(self, request, *args, **kwargs):
         user = request.user
         log_payload = build_log_payload(
@@ -220,21 +193,8 @@ class LogoutView(APIView):
 
 
 class ValidateUsersByMatriculaView(APIView):
-    """
-    Valida se uma lista de matrículas de usuários existe no sistema.
-    """
     permission_classes = [AllowAny]
 
-    @extend_schema(
-        tags=["Usuários"],
-        summary="Verifica a existência de usuários por matrícula",
-        description="Recebe uma lista de matrículas e retorna quais são válidas e quais são inválidas.",
-        request=MatriculasRequestSerializer,
-        responses={
-            200: OpenApiResponse(description="Validação bem-sucedida. O corpo da resposta contém as listas `valid_ids` e `invalid_ids`."),
-            400: OpenApiResponse(description="Erro na requisição, como formato de entrada inválido."),
-        }
-    )
     def post(self, request, *args, **kwargs):
         matriculas_para_validar = request.data.get('user_ids', [])
 
@@ -291,37 +251,16 @@ class ValidateUsersByMatriculaView(APIView):
 
 
 class UserMeView(APIView):
-    """
-    Endpoint para o usuário logado buscar seus próprios dados.
-    """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        tags=["Usuários"],
-        summary="Retorna dados do usuário logado",
-        description="Utiliza o token de autenticação para identificar o usuário e retornar seus dados detalhados.",
-        responses={200: UserSerializer}
-    )
     def get(self, request, *args, **kwargs):
         serializer = UserSerializer(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class UserDetailView(APIView):
-    """
-    Endpoint público para buscar os dados de um usuário específico.
-    """
     permission_classes = [AllowAny]
 
-    @extend_schema(
-        tags=["Usuários"],
-        summary="Busca um usuário por matrícula",
-        description="Note que o `id` na URL corresponde à `matrícula` do usuário.",
-        responses={
-            200: UserSerializer,
-            404: OpenApiResponse(description="Usuário com a matrícula especificada não foi encontrado.")
-        }
-    )
     def get(self, request, id, *args, **kwargs):
         user = get_object_or_404(User, matricula=id)
         serializer = UserSerializer(user)
@@ -329,21 +268,8 @@ class UserDetailView(APIView):
 
 
 class UsersByIdView(APIView):
-    """
-    Recebe uma lista de matrículas e retorna os dados dos usuários encontrados.
-    """
     permission_classes = [AllowAny]
 
-    @extend_schema(
-        tags=["Usuários"],
-        summary="Busca múltiplos usuários por matrícula",
-        request={
-            "application/json": {"example": {"ids": ["20210001", "20210002"]}}},
-        responses={
-            200: UserSerializer(many=True),
-            400: OpenApiResponse(description="Corpo da requisição inválido ou ausente.")
-        }
-    )
     def post(self, request, *args, **kwargs):
         ids = request.data.get("ids", [])
 
