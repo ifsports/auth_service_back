@@ -93,8 +93,19 @@ def suap_oauth_callback_view(request):
 
     vinculo_data = data_suap.get('vinculo', {})
 
+    email_suap = (
+        data_suap.get('email_google_classroom')
+        or data_suap.get('email')
+        or data_suap.get('email_preferencial')
+        or data_suap.get('email_academico')
+        or data_suap.get('email_secundario')
+    )
+
+    if not email_suap:
+        return HttpResponseRedirect(f"{frontend_url_base}/login?error=email_nao_encontrado")
+
     user_defaults = {
-        'email': data_suap.get('email_google_classroom'),
+        'email': email_suap,
         'nome': data_suap.get('nome_usual'),
         'campus': vinculo_data.get('campus'),
         'foto': data_suap.get('url_foto_75x100', ''),
