@@ -94,7 +94,7 @@ def suap_oauth_callback_view(request):
     vinculo_data = data_suap.get('vinculo', {})
 
     user_defaults = {
-        'email': data_suap.get('email'),
+        'email': data_suap.get('email_google_classroom'),
         'nome': data_suap.get('nome_usual'),
         'campus': vinculo_data.get('campus'),
         'foto': data_suap.get('url_foto_75x100', ''),
