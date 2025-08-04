@@ -158,9 +158,9 @@ class LoginView(APIView):
         summary="Autentica um organizador via matrícula e senha.",
         description="""
 Autentica um usuário (geralmente um organizador) com base na matrícula e senha locais.
-Não é utilizado por alunos/jogadores, que devem logar via SUAP.
 
 **Exemplo de Corpo da Requisição (Payload):**
+
 .. code-block:: json
 
    {
@@ -169,6 +169,7 @@ Não é utilizado por alunos/jogadores, que devem logar via SUAP.
    }
 
 **Exemplo de Resposta de Sucesso:**
+
 .. code-block:: json
 
    {
@@ -177,7 +178,7 @@ Não é utilizado por alunos/jogadores, que devem logar via SUAP.
    }
 """,
         responses={
-            200: OpenApiResponse(description="Autenticação bem-sucedida. Retorna os tokens de acesso e refresh."),
+            200: OpenApiResponse(description="Autenticação bem-sucedida. Retorna os tokens."),
             401: OpenApiResponse(description="Credenciais inválidas."),
             403: OpenApiResponse(description="Esta conta está desativada.")
         }
@@ -259,18 +260,30 @@ class ValidateUsersByMatriculaView(APIView):
         tags=["Usuários"],
         summary="Verifica a existência de usuários por matrícula.",
         description="""
-Recebe uma lista de matrículas e retorna quais são válidas (existem no banco) e quais são inválidas.
+Recebe uma lista de matrículas e retorna quais são válidas e quais são inválidas.
 
 **Exemplo de Corpo da Requisição (Payload):**
+
 .. code-block:: json
 
    {
      "user_ids": ["20210001", "20210002", "matricula_invalida"]
    }
+
+**Exemplo de Resposta:**
+
+.. code-block:: json
+
+   {
+     "all_exist": false,
+     "message": "As seguintes matrículas não foram encontradas: matricula_invalida",
+     "valid_ids": ["20210001", "20210002"],
+     "invalid_ids": ["matricula_invalida"]
+   }
 """,
         responses={
-            200: OpenApiResponse(description="Validação concluída com sucesso."),
-            400: OpenApiResponse(description="Erro na requisição, como formato de entrada inválido.")
+            200: OpenApiResponse(description="Validação concluída."),
+            400: OpenApiResponse(description="Erro no formato da requisição.")
         }
     )
     def post(self, request, *args, **kwargs):
@@ -334,7 +347,30 @@ class UserMeView(APIView):
     @extend_schema(
         tags=["Usuários"],
         summary="Retorna os dados do usuário atualmente autenticado.",
-        description="Utiliza o token de autenticação enviado no header para identificar o usuário e retornar seus dados detalhados.",
+        description="""
+Utiliza o token de autenticação enviado no header para identificar o usuário.
+
+**Exemplo de Resposta de Sucesso:**
+
+.. code-block:: json
+
+   {
+     "id": "1",
+     "matricula": "20221094040022",
+     "email": "usuario@exemplo.com",
+     "nome": "Nome do Usuário",
+     "campus": "CN",
+     "foto": "https://url.da.foto/imagem.png",
+     "sexo": "M",
+     "tipo_usuario": "ALUNO",
+     "curso": "Técnico em Informática",
+     "situacao": "Matriculado",
+     "data_nascimento": "2005-10-20",
+     "is_active": true,
+     "is_staff": false,
+     "groups": ["Jogador"]
+   }
+""",
         responses={
             200: UserSerializer,
             401: OpenApiResponse(description="Não autenticado.")
@@ -351,7 +387,30 @@ class UserDetailView(APIView):
     @extend_schema(
         tags=["Usuários"],
         summary="Busca os dados de um usuário específico por matrícula.",
-        description="Note que o `id` na URL corresponde à `matrícula` do usuário.",
+        description="""
+Note que o `id` na URL corresponde à `matrícula` do usuário.
+
+**Exemplo de Resposta de Sucesso:**
+
+.. code-block:: json
+
+   {
+     "id": "a1b2c3d4...",
+     "matricula": "20210002",
+     "email": "outro@exemplo.com",
+     "nome": "Outro Usuário",
+     "campus": "PF",
+     "foto": "https://url.da.foto/outra.png",
+     "sexo": "F",
+     "tipo_usuario": "SERVIDOR",
+     "curso": null,
+     "situacao": "Ativo",
+     "data_nascimento": "1990-05-15",
+     "is_active": true,
+     "is_staff": true,
+     "groups": ["Organizador"]
+   }
+""",
         responses={
             200: UserSerializer,
             404: OpenApiResponse(description="Usuário com a matrícula especificada não foi encontrado.")
@@ -373,6 +432,7 @@ class UsersByIdView(APIView):
 Recebe uma lista de matrículas e retorna uma lista com os dados dos usuários encontrados.
 
 **Exemplo de Corpo da Requisição (Payload):**
+
 .. code-block:: json
 
    {
