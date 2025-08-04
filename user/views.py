@@ -20,6 +20,8 @@ from messaging import send_audit_log, build_log_payload
 
 from concurrent.futures import ThreadPoolExecutor
 
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
+
 SUAP_TOKEN_URL = "https://suap.ifrn.edu.br/o/token/"
 SUAP_API_EU_URL = "https://suap.ifrn.edu.br/api/rh/eu"
 SUAP_API_MEUS_DADOS_URL = "https://suap.ifrn.edu.br/api/v2/minhas-informacoes/meus-dados/"
@@ -42,6 +44,7 @@ def get_tokens_for_user(user):
     }
 
 
+@extend_schema(exclude=True)
 def suap_oauth_callback_view(request):
     code = request.GET.get("code")
     frontend_url_base = getattr(
@@ -61,17 +64,14 @@ def suap_oauth_callback_view(request):
     access_token_suap = suap_token_data.get("access_token")
     headers_suap_api = {"Authorization": f"Bearer {access_token_suap}"}
 
-    # 2. BUSCA OS DADOS DO USUÁRIO EM PARALELO PARA GANHAR VELOCIDADE
     data_suap = {}
     data_eu = {}
     with ThreadPoolExecutor() as executor:
-        # Dispara as duas requisições ao mesmo tempo
         future_meus_dados = executor.submit(
             requests.get, SUAP_API_MEUS_DADOS_URL, headers=headers_suap_api, timeout=10)
         future_eu = executor.submit(
             requests.get, SUAP_API_EU_URL, headers=headers_suap_api, timeout=10)
 
-        # Espera os resultados e trata possíveis erros
         try:
             response_meus_dados = future_meus_dados.result()
             if response_meus_dados.status_code == 200:
@@ -86,7 +86,6 @@ def suap_oauth_callback_view(request):
         except Exception as e:
             print(f"AVISO: Falha ao buscar dados da API EU: {e}")
 
-    # 3. COMBINA OS DADOS E SALVA O USUÁRIO
     matricula_suap = data_suap.get('matricula')
     if not matricula_suap:
         return HttpResponseRedirect(f"{frontend_url_base}/login?error=falha_suap")
@@ -154,6 +153,35 @@ def suap_oauth_callback_view(request):
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Autenticação"],
+        summary="Autentica um organizador via matrícula e senha.",
+        description="""
+Autentica um usuário (geralmente um organizador) com base na matrícula e senha locais.
+Não é utilizado por alunos/jogadores, que devem logar via SUAP.
+
+**Exemplo de Corpo da Requisição (Payload):**
+.. code-block:: json
+
+   {
+     "matricula": "20210000000001",
+     "password": "senha_forte_123"
+   }
+
+**Exemplo de Resposta de Sucesso:**
+.. code-block:: json
+
+   {
+     "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+     "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+   }
+""",
+        responses={
+            200: OpenApiResponse(description="Autenticação bem-sucedida. Retorna os tokens de acesso e refresh."),
+            401: OpenApiResponse(description="Credenciais inválidas."),
+            403: OpenApiResponse(description="Esta conta está desativada.")
+        }
+    )
     def post(self, request, *args, **kwargs):
         matricula = request.data.get('matricula')
         password = request.data.get('password')
@@ -190,6 +218,27 @@ class LoginView(APIView):
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Autenticação"],
+        summary="Registra o evento de logout do usuário.",
+        description="""
+Este endpoint apenas registra a intenção de logout para fins de auditoria.
+O cliente (frontend) é responsável por apagar os tokens armazenados localmente para efetivar o logout.
+
+**Esta rota não recebe corpo na requisição.**
+""",
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                description="Logout recebido. O cliente deve apagar os tokens.",
+                examples=[
+                    OpenApiExample('Exemplo de Resposta', value={
+                                   'detail': 'Logout recebido. O cliente deve invalidar/remover os tokens JWT.'})
+                ]
+            ),
+            401: OpenApiResponse(description="Não autenticado.")
+        }
+    )
     def post(self, request, *args, **kwargs):
         user = request.user
         log_payload = build_log_payload(
@@ -206,6 +255,24 @@ class LogoutView(APIView):
 class ValidateUsersByMatriculaView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Usuários"],
+        summary="Verifica a existência de usuários por matrícula.",
+        description="""
+Recebe uma lista de matrículas e retorna quais são válidas (existem no banco) e quais são inválidas.
+
+**Exemplo de Corpo da Requisição (Payload):**
+.. code-block:: json
+
+   {
+     "user_ids": ["20210001", "20210002", "matricula_invalida"]
+   }
+""",
+        responses={
+            200: OpenApiResponse(description="Validação concluída com sucesso."),
+            400: OpenApiResponse(description="Erro na requisição, como formato de entrada inválido.")
+        }
+    )
     def post(self, request, *args, **kwargs):
         matriculas_para_validar = request.data.get('user_ids', [])
 
@@ -264,6 +331,15 @@ class ValidateUsersByMatriculaView(APIView):
 class UserMeView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Usuários"],
+        summary="Retorna os dados do usuário atualmente autenticado.",
+        description="Utiliza o token de autenticação enviado no header para identificar o usuário e retornar seus dados detalhados.",
+        responses={
+            200: UserSerializer,
+            401: OpenApiResponse(description="Não autenticado.")
+        }
+    )
     def get(self, request, *args, **kwargs):
         serializer = UserSerializer(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -272,6 +348,15 @@ class UserMeView(APIView):
 class UserDetailView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Usuários"],
+        summary="Busca os dados de um usuário específico por matrícula.",
+        description="Note que o `id` na URL corresponde à `matrícula` do usuário.",
+        responses={
+            200: UserSerializer,
+            404: OpenApiResponse(description="Usuário com a matrícula especificada não foi encontrado.")
+        }
+    )
     def get(self, request, id, *args, **kwargs):
         user = get_object_or_404(User, matricula=id)
         serializer = UserSerializer(user)
@@ -281,6 +366,24 @@ class UserDetailView(APIView):
 class UsersByIdView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Usuários"],
+        summary="Busca múltiplos usuários por uma lista de matrículas.",
+        description="""
+Recebe uma lista de matrículas e retorna uma lista com os dados dos usuários encontrados.
+
+**Exemplo de Corpo da Requisição (Payload):**
+.. code-block:: json
+
+   {
+     "ids": ["20210001", "20210002"]
+   }
+""",
+        responses={
+            200: UserSerializer(many=True),
+            400: OpenApiResponse(description="Corpo da requisição inválido ou ausente.")
+        }
+    )
     def post(self, request, *args, **kwargs):
         ids = request.data.get("ids", [])
 
