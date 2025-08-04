@@ -94,11 +94,11 @@ def suap_oauth_callback_view(request):
     vinculo_data = data_suap.get('vinculo', {})
 
     email_suap = (
-        data_suap.get('email_google_classroom')
-        or data_suap.get('email')
-        or data_suap.get('email_preferencial')
-        or data_suap.get('email_academico')
-        or data_suap.get('email_secundario')
+        data_eu.get('email_google_classroom')
+        or data_eu.get('email')
+        or data_eu.get('email_preferencial')
+        or data_eu.get('email_academico')
+        or data_eu.get('email_secundario')
     )
 
     if not email_suap:
